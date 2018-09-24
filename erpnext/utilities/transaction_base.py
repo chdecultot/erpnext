@@ -37,11 +37,19 @@ class TransactionBase(StatusUpdater):
 			self._add_calendar_event(opts)
 
 	def delete_events(self):
-		events = frappe.db.sql_list("""select name from `tabEvent`
-			where ref_type=%s and ref_name=%s""", (self.doctype, self.name))
+		events = frappe.db.sql_list("""select parent from `tabEvent Participants` where reference_doctype=%s
+			and reference_docname=%s and parenttype='Event'""", (self.doctype, self.name))
+
 		if events:
-			frappe.db.sql("delete from `tabEvent` where name in ({0})"
-				.format(", ".join(['%s']*len(events))), tuple(events))
+			for event in events:
+				participants_count = frappe.db.sql("""select count(name) from `tabEvent Participants`
+					where parenttype='Event' and parent=%s""", (event))
+				
+				if participants_count[0][0]==1:
+					frappe.get_doc("Event", event).delete()
+				else:
+					frappe.db.sql("""delete from `tabEvent Participants` where reference_doctype=%s
+						and reference_docname=%s and and parent=%s parenttype='Event'""", (self.doctype, self.name, event))
 
 	def _add_calendar_event(self, opts):
 		opts = frappe._dict(opts)
@@ -55,8 +63,10 @@ class TransactionBase(StatusUpdater):
 				"starts_on":  self.contact_date,
 				"ends_on": opts.ends_on,
 				"event_type": "Private",
-				"ref_type": self.doctype,
-				"ref_name": self.name
+				"event_participants": [{
+					"reference_doctype": self.doctype,
+					"reference_docname": self.name
+				}]
 			})
 
 			event.insert(ignore_permissions=True)

@@ -74,8 +74,10 @@ class MaintenanceSchedule(TransactionBase):
 					"description": description,
 					"starts_on": cstr(key["scheduled_date"]) + " 10:00:00",
 					"event_type": "Private",
-					"ref_type": self.doctype,
-					"ref_name": self.name
+					"event_participants": [{
+						"reference_doctype": self.doctype,
+						"reference_docname": self.name
+					}]
 				}).insert(ignore_permissions=1)
 
 		frappe.db.set(self, 'status', 'Submitted')
