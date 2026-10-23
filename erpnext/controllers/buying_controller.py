@@ -98,7 +98,8 @@ class BuyingController(SubcontractingController):
 				),
 			)
 
-		if self.get("company") and not self.get("terms"):
+		# Only drafts: changing terms on a submitted doc blocks update after submit
+		if self.docstatus.is_draft() and self.get("company") and not self.get("terms"):
 			if not self.get("tc_name"):
 				self.tc_name = frappe.get_value("Company", self.company, "default_buying_terms")
 			self.set_missing_terms()

@@ -17,6 +17,7 @@ from erpnext.accounts.doctype.mode_of_payment.test_mode_of_payment import (
 from erpnext.accounts.doctype.pos_profile.test_pos_profile import make_pos_profile
 from erpnext.accounts.doctype.purchase_invoice.purchase_invoice import WarehouseMissingError
 from erpnext.accounts.doctype.purchase_invoice.test_purchase_invoice import (
+	make_terms_and_conditions,
 	unlink_payment_on_cancel_of_invoice,
 )
 from erpnext.accounts.doctype.sales_invoice.mapper import make_inter_company_transaction
@@ -1359,6 +1360,20 @@ class TestSalesInvoice(ERPNextTestSuite):
 
 		self.assertEqual(pos.grand_total, 100.0)
 		self.assertEqual(pos.write_off_amount, 0)
+
+	def test_default_terms_not_set_on_submitted_invoice(self):
+		si = create_sales_invoice()
+		self.assertFalse(si.tc_name)
+
+		terms = make_terms_and_conditions("_Test Default Selling Terms", selling=1)
+		frappe.db.set_value("Company", si.company, "default_selling_terms", terms)
+
+		# The desk runs onload, then sends the doc back on "Update After Submit"
+		si = frappe.get_doc("Sales Invoice", si.name)
+		si.run_method("onload")
+		self.assertFalse(si.tc_name)
+		self.assertFalse(si.terms)
+		si.save()
 
 	def test_set_pos_fields_populates_invoice_from_profile(self):
 		terms = frappe.db.exists("Terms and Conditions", "_Test POS Terms")

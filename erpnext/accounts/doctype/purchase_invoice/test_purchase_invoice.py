@@ -2659,6 +2659,28 @@ class TestPurchaseInvoice(ERPNextTestSuite, StockTestMixin):
 		]
 		check_gl_entries(self, pi.name, expected_gle, nowdate())
 
+	def test_default_terms_not_set_on_submitted_invoice(self):
+		pi = make_purchase_invoice()
+		self.assertFalse(pi.tc_name)
+
+		terms = make_terms_and_conditions("_Test Default Buying Terms", buying=1)
+		frappe.db.set_value("Company", pi.company, "default_buying_terms", terms)
+
+		# The desk runs onload, then sends the doc back on "Update After Submit"
+		pi = frappe.get_doc("Purchase Invoice", pi.name)
+		pi.run_method("onload")
+		self.assertFalse(pi.tc_name)
+		self.assertFalse(pi.terms)
+
+		pi.items[0].expense_account = "Service - _TC"
+		pi.save()
+
+		draft = make_purchase_invoice(do_not_save=True)
+		draft.insert()
+		draft = frappe.get_doc("Purchase Invoice", draft.name)
+		draft.run_method("onload")
+		self.assertEqual(draft.tc_name, terms)
+
 	def test_create_purchase_invoice_without_mandatory(self):
 		pi = frappe.new_doc("Purchase Invoice")
 		pi.company = "_Test Company"
@@ -4214,3 +4236,17 @@ def toggle_provisional_accounting_setting(**args):
 	company.enable_provisional_accounting_for_non_stock_items = args.enable or 0
 	company.default_provisional_account = args.provisional_account
 	company.save()
+
+
+def make_terms_and_conditions(title, buying=0, selling=0):
+	if not frappe.db.exists("Terms and Conditions", title):
+		frappe.get_doc(
+			{
+				"doctype": "Terms and Conditions",
+				"title": title,
+				"terms": title,
+				"buying": buying,
+				"selling": selling,
+			}
+		).insert()
+	return title
